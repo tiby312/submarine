@@ -112,6 +112,7 @@ fn main() {
     let color=game_response.color.unwrap();
 
 
+
     let mut bot_verticies=Mutex::new(Vec::new());
 
     let mut bot_buffer=glsys.create_vbo(0);
@@ -128,16 +129,17 @@ fn main() {
     let mut mousepos=vec2(0.0,0.0);
     #[derive(Clone,Debug)]
     struct GameInputs{
+        border:axgeom::Rect<f32>,
         keystrokes:Vec<VirtualKeyCode>,
         mouseposes:Vec<Vec2<f32>>
     }
 
-    let game_inputs=GameInputs{keystrokes:Vec::new(),mouseposes:Vec::new()};
+    let game_inputs=GameInputs{border,keystrokes:Vec::new(),mouseposes:Vec::new()};
     let game_inputs=Mutex::new(game_inputs);
 
 
     
-    let (tx, rx): (mpsc::Sender<i32>, mpsc::Receiver<i32>) = mpsc::channel();
+    let (tx, rx): (mpsc::Sender<GameResponse>, mpsc::Receiver<GameResponse>) = mpsc::channel();
 
     //TODO talk to glutin about why there is a static lifetime bound.
     let game_inputs_ref:&Mutex<GameInputs>=unsafe{&*(&game_inputs as *const _)};
@@ -145,6 +147,7 @@ fn main() {
 
     crossbeam::thread::scope(move |s| {
         s.spawn(move |s| {
+            
             loop{
                 let game_inputs = {
                     let mut gg=game_inputs_ref.lock().unwrap();
@@ -153,27 +156,23 @@ fn main() {
                     gg.mouseposes.clear();
                     game_inputs
                 };
+                //dbg!(game_inputs.border);
+
                 //mutex get mouse pos    
-                let game_response=display1.step(&game_inputs.mouseposes,&border,&symbols,&game_inputs.keystrokes);
+                let game_response=display1.step(&game_inputs.mouseposes,&game_inputs.border,&symbols,&game_inputs.keystrokes);
 
                 
                 let game_response = if game_response.next_world{
                     let k=Display2::new(&symbols);
-                    //let ((rect,radius))=k.1.new_game_world.unwrap();
-                    //border=compute_border(rect,[startx as f32,starty as f32]);
-                    //glsys.set_camera_and_bot_radius(border,radius);
                         
                     display1=Box::new(k.0);
-                    /*
-                    for _ in 0..1000{
-                        display1.step(&va,&border,&symbols,&keystrokes);
-                    }
-                    */
-                    //display_counter=200;
                     k.1
                 }else{
                     game_response
                 };
+
+                tx.send(game_response);
+                
 
                 {
                     let mut bot_verticies=bot_verticies_ref.lock().unwrap();
@@ -182,7 +181,6 @@ fn main() {
                         bot_verticies.push(Vertex([b.pos.x,b.pos.y,1.0]))    
                     }
                 }
-                tx.send(0);
                 
                 //notify main thread to draw
                 std::thread::sleep(std::time::Duration::from_millis(16));
@@ -228,11 +226,24 @@ fn main() {
                     
                     WindowEvent::CursorMoved{modifiers:_,device_id:_,position:logical_position} => {
                         let glutin::dpi::LogicalPosition{x,y}=logical_position;
-                        mousepos=vec2(x as f32,y as f32);
+                        let mousepos2=vec2(x as f32,y as f32);
+                        //let mut va:Vec<Vec2<f32>>=poses.iter().map(|a|a.pos).collect();
+                        
+                        let mouseposx=mousepos2.x-(startx as f32/2.0);
+                        let mouseposy=mousepos2.y-(starty as f32/2.0);
+                    
+                        let ((x1,x2),(y1,y2))=border.get();
+                        let w=x2-x1;
+                        let h=y2-y1;
+
+                        let mouseposx=mouseposx*(w/startx as f32);
+                        let mouseposy=mouseposy*(h/starty as f32);
+                       
+                        mousepos=vec2(mouseposx,mouseposy);
                     },
                     WindowEvent::RedrawRequested => {
                         println!("redraaaaw");
-                        glsys.set_camera_and_bot_radius(border,radius);
+                        //glsys.set_camera_and_bot_radius(border,radius);
                            
                         /*
                         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
@@ -242,11 +253,15 @@ fn main() {
                     _=>{}
                 },
                 EventsCleared=>{
-                    if let Ok(_) = rx.try_recv(){
+                    if let Ok(game_response) = rx.try_recv(){
                         
-                        if game_response.next_world{
-                            let ((rect,radius))=game_response.new_game_world.unwrap();
+                        if let Some(new_game_world)=game_response.new_game_world{
+                            let ((rect,radius))=new_game_world;
                             border=compute_border(rect,[startx as f32,starty as f32]);
+                            {
+                            let mut vv=game_inputs_ref.lock().unwrap();
+                            vv.border=border;
+                            }
                             glsys.set_camera_and_bot_radius(border,radius);
                             
                         }
@@ -268,7 +283,7 @@ fn main() {
                         };
 
                         let mut ss=glsys.new_draw_session([0.0,0.0,0.4]);
-                        ss.draw_vbo_section(&bot_buffer,0,ll,[1.0,0.0,1.0]);
+                        ss.draw_vbo_section(&bot_buffer,0,ll,color);
                         //ss.draw_vbo_section(&bot_buffer,0,200,[1.0,0.0,3.0]);
                         //ss.draw_vbo_section(&bot_buffer,200,display1.get_bots().len(),color);
                         ss.finish();

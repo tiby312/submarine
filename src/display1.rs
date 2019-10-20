@@ -8,7 +8,7 @@ use crate::Symbols;
 use dinotreedemo::duckduckgeo;
 use duckduckgeo::bot::Bot;
 
-
+#[derive(Debug,Clone,Copy)]
 pub struct GameResponse
 {
     pub color:          Option<[f32;3]>,
