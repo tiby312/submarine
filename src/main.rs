@@ -129,12 +129,12 @@ fn main() {
     let mut mousepos=vec2(0.0,0.0);
     #[derive(Clone,Debug)]
     struct GameInputs{
-        border:axgeom::Rect<f32>,
+        //border:axgeom::Rect<f32>,
         keystrokes:Vec<VirtualKeyCode>,
         mouseposes:Vec<Vec2<f32>>
     }
 
-    let game_inputs=GameInputs{border,keystrokes:Vec::new(),mouseposes:Vec::new()};
+    let game_inputs=GameInputs{keystrokes:Vec::new(),mouseposes:Vec::new()};
     let game_inputs=Mutex::new(game_inputs);
 
 
@@ -147,7 +147,7 @@ fn main() {
 
     crossbeam::thread::scope(move |s| {
         s.spawn(move |s| {
-            
+            let mut border=border;
             loop{
                 let game_inputs = {
                     let mut gg=game_inputs_ref.lock().unwrap();
@@ -159,17 +159,21 @@ fn main() {
                 //dbg!(game_inputs.border);
 
                 //mutex get mouse pos    
-                let game_response=display1.step(&game_inputs.mouseposes,&game_inputs.border,&symbols,&game_inputs.keystrokes);
+                let game_response=display1.step(&game_inputs.mouseposes,&border,&symbols,&game_inputs.keystrokes);
 
                 
                 let game_response = if game_response.next_world{
                     let k=Display2::new(&symbols);
-                        
                     display1=Box::new(k.0);
                     k.1
                 }else{
                     game_response
                 };
+
+                if let Some(new_game_world)= game_response.new_game_world{
+                    border=compute_border(new_game_world.0,[startx as f32,starty as f32]);
+                    
+                }
 
                 tx.send(game_response);
                 
@@ -258,10 +262,12 @@ fn main() {
                         if let Some(new_game_world)=game_response.new_game_world{
                             let ((rect,radius))=new_game_world;
                             border=compute_border(rect,[startx as f32,starty as f32]);
+                            /*
                             {
                             let mut vv=game_inputs_ref.lock().unwrap();
                             vv.border=border;
                             }
+                            */
                             glsys.set_camera_and_bot_radius(border,radius);
                             
                         }
