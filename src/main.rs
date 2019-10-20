@@ -129,12 +129,11 @@ fn main() {
     let mut mousepos=vec2(0.0,0.0);
     #[derive(Clone,Debug)]
     struct GameInputs{
-        //border:axgeom::Rect<f32>,
         keystrokes:Vec<VirtualKeyCode>,
         mouseposes:Vec<Vec2<f32>>
     }
 
-    let game_inputs=GameInputs{keystrokes:Vec::new(),mouseposes:Vec::new()};
+    let mut game_inputs=GameInputs{keystrokes:Vec::new(),mouseposes:Vec::new()};
     let game_inputs=Mutex::new(game_inputs);
 
 
@@ -149,6 +148,10 @@ fn main() {
         s.spawn(move |s| {
             let mut border=border;
             loop{
+                let kk=std::time::Instant::now();
+
+
+                println!("game loop");
                 let game_inputs = {
                     let mut gg=game_inputs_ref.lock().unwrap();
                     let game_inputs=gg.clone();
@@ -172,7 +175,9 @@ fn main() {
 
                 if let Some(new_game_world)= game_response.new_game_world{
                     border=compute_border(new_game_world.0,[startx as f32,starty as f32]);
-                    
+                    for _ in 0..100{
+                        display1.step(&game_inputs.mouseposes,&border,&symbols,&game_inputs.keystrokes);
+                    }
                 }
 
                 tx.send(game_response);
@@ -186,8 +191,13 @@ fn main() {
                     }
                 }
                 
+                let elapsed=kk.elapsed().as_millis() as u64;
+                println!("elapsed={:?}",elapsed);
                 //notify main thread to draw
-                std::thread::sleep(std::time::Duration::from_millis(16));
+
+                let elapsed = if elapsed>16 {16}else{elapsed};
+                std::thread::sleep(std::time::Duration::from_millis(16-elapsed));
+                
             }
         });
 
@@ -207,14 +217,14 @@ fn main() {
                         }
 
                         if input.state==ElementState::Released{
-                            let mut vv=game_inputs_ref.lock().unwrap();
+                            let mut game_inputs=game_inputs_ref.lock().unwrap();
                             if let Some(k)=input.virtual_keycode{
-                                vv.keystrokes.push(k);
+                                game_inputs.keystrokes.push(k);
                             }
 
                             if let Some(k)=input.virtual_keycode{
                                 if k==VirtualKeyCode::C{
-                                    vv.mouseposes.push(mousepos);
+                                    game_inputs.mouseposes.push(mousepos);
                                     //mouse_active=true
                                 }
                             }
@@ -257,9 +267,12 @@ fn main() {
                     _=>{}
                 },
                 EventsCleared=>{
-                    if let Ok(game_response) = rx.try_recv(){
-                        
+                    //println!("mmmmm");
+                    //if game_response in rx.try_iter(){
+                    if let Ok(game_response)=rx.try_recv(){
+                        println!("main loop");
                         if let Some(new_game_world)=game_response.new_game_world{
+                            println!("AYYYYY");
                             let ((rect,radius))=new_game_world;
                             border=compute_border(rect,[startx as f32,starty as f32]);
                             /*
@@ -288,7 +301,7 @@ fn main() {
                             bot_verticies.len()
                         };
 
-                        let mut ss=glsys.new_draw_session([0.0,0.0,0.4]);
+                        let mut ss=glsys.new_draw_session([0.0,0.0,0.0]);
                         ss.draw_vbo_section(&bot_buffer,0,ll,color);
                         //ss.draw_vbo_section(&bot_buffer,0,200,[1.0,0.0,3.0]);
                         //ss.draw_vbo_section(&bot_buffer,200,display1.get_bots().len(),color);

@@ -52,12 +52,12 @@ impl Display2{
     pub fn new(symbols:&Symbols)->(Display2,GameResponse){
         let (sys,rect,radius)=BotSystem::new(40_000);
         let numberthings=[
-            NumberThing::new(4,300.0,30.0,vec2(-300.0,-300.0)),
-            NumberThing::new(2,300.0,30.0,vec2(-100.0,-100.0)),
-            NumberThing::new(6,300.0,30.0,vec2(100.0,-100.0)),
-            NumberThing::new(7,300.0,30.0,vec2(300.0,300.0)),
+            NumberThing::new(8,300.0,30.0,vec2(-1500.0,-300.0)),
+            NumberThing::new(8,300.0,30.0,vec2(-300.0,-100.0)),
+            NumberThing::new(0,300.0,30.0,vec2(100.0,300.0)),
+            NumberThing::new(2,300.0,30.0,vec2(1200.0,600.0)),
         ];
-        (Display2{bots:sys,numberthings},GameResponse{color:Some([1.0,0.0,1.0]),new_game_world:Some((rect,radius)),next_world:false})
+        (Display2{bots:sys,numberthings},GameResponse{color:Some([0.0,1.0,0.0]),new_game_world:Some((rect,radius)),next_world:false})
     }
 }
 
@@ -296,7 +296,7 @@ impl Display1{
             NumberThing::new(40_000,unit*15.0,unit*2.0,vec2(x,y))
         };
 
-        let col=[1.0,1.0,0.0];
+        let col=[0.0,1.0,0.0];
 
         let pin_code=PinCode::new(vec2(50.0,50.0),100.0,10.0);
 
