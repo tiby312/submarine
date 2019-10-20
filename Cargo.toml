@@ -7,6 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-glutin = "0.21.0"
+crossbeam = "0.7.2"
+rayon = "*"
+num_cpus = "*"
 demodesktopgraphics = {path = "../demodesktopgraphics"}
-dinotreedemomenu = {path="../dinotreedemomenu"}
+laid_dot = {path = "../laid_dot"}
+ascii_num = {path = "../ascii_num"}
+dinotreedemo = {path="../dinotreedemo"}

@@ -1,22 +1,90 @@
 use dinotreedemo::dinotree::axgeom;
-use glutin::VirtualKeyCode;
+use crate::glutin::event::VirtualKeyCode;
 use laid_dot::*;
 use ascii_num::*;
-
+use dinotreedemo::BotSystem;
 use axgeom::*;
 use crate::Symbols;
+use dinotreedemo::duckduckgeo;
+use duckduckgeo::bot::Bot;
 
-pub struct Bot{
-    pub pos:Vec2<f32>,
-    pub vel:Vec2<f32>,
-    pub acc:Vec2<f32>
-}
 
 pub struct GameResponse
 {
     pub color:          Option<[f32;3]>,
-    pub new_game_world: Option<(Rect<f32>,f32)>
+    pub new_game_world: Option<(Rect<f32>,f32)>,
+    pub next_world : bool
 }
+
+pub struct Timer<T>{
+    counter:usize,
+    inner:Option<T>
+}
+impl<T> Timer<T>{
+    pub fn new(counter:usize,inner:T)->Timer<T>{
+        Timer{counter,inner:Some(inner)}
+    }
+    pub fn step(&mut self)->Option<T>{
+        if self.inner.is_some() && self.counter==0{
+            return self.inner.take();
+        }
+        if self.counter>0{
+            self.counter-=1;
+        }
+        None
+    }
+}
+
+
+pub trait MenuTrait:Send+Sync{
+    fn step(&mut self,poses:&[Vec2<f32>],border:&Rect<f32>,symbols:&Symbols,keystrokes:&[VirtualKeyCode])->GameResponse;
+    fn get_bots(&self)->&[Bot];
+}
+
+
+
+pub struct Display2{
+    bots:BotSystem,
+    numberthings:[NumberThing;4],
+}
+
+impl Display2{
+    pub fn new(symbols:&Symbols)->(Display2,GameResponse){
+        let (sys,rect,radius)=BotSystem::new(40_000);
+        let numberthings=[
+            NumberThing::new(4,300.0,30.0,vec2(-300.0,-300.0)),
+            NumberThing::new(2,300.0,30.0,vec2(-100.0,-100.0)),
+            NumberThing::new(6,300.0,30.0,vec2(100.0,-100.0)),
+            NumberThing::new(7,300.0,30.0,vec2(300.0,300.0)),
+        ];
+        (Display2{bots:sys,numberthings},GameResponse{color:Some([1.0,0.0,1.0]),new_game_world:Some((rect,radius)),next_world:false})
+    }
+}
+
+impl MenuTrait for Display2{
+    fn step(&mut self,poses:&[Vec2<f32>],_border:&Rect<f32>,symbols:&Symbols,keystrokes:&[VirtualKeyCode])->GameResponse{
+        self.bots.step(poses,_border);
+        let mut bb=self.bots.get_bots_mut().iter_mut();
+        for numberthing in self.numberthings.iter(){
+            for digit in numberthing.iter(&symbols.digit_table){
+                for pos in digit{
+                    let k=bb.next().unwrap();
+                    k.pos=pos;
+                    k.vel=vec2same(0.);
+                    k.acc=vec2same(0.);
+                }
+            }
+        }
+
+        GameResponse{color:None,new_game_world:None,next_world:false}
+    }
+
+    fn get_bots(&self)->&[Bot]{
+        self.bots.get_bots()
+    }
+}
+
+
 
 
 pub struct Display1{
@@ -26,82 +94,14 @@ pub struct Display1{
     color_clicker:Clicker,
     col_counter:usize,
     numberthing:NumberThing,
-    pin_code:PinCode
+    pin_code:PinCode,
+    pin_code_counter:Option<Timer<PinEnterResult>>
 }
 
-impl Display1{
 
-    pub fn new(symbols:&Symbols)->(Display1,GameResponse){
-        
-        let num_bots=5_000;
-        
-        let startx=500.0;
-        let starty=500.0;
+impl MenuTrait for Display1{
 
-        //let border= axgeom::Rect::new(NotNaN::new(-startx).unwrap(),NotNaN::new(startx).unwrap(),NotNaN::new(-starty).unwrap(),NotNaN::new(starty).unwrap());
-        let borderf32= axgeom::Rect::new(-startx,startx ,-starty,starty);
-
-        //used as the building block for all positions
-        let unit=8.0;//bot::get_unit(startx,starty);
-        
-        //let br=unit*1.0;
-        //let mr=unit*10.0;
-
-        //let (bot_prop,mouse_prop)=bot::create_from_radius(br,mr);
-        //let bots=bot::create_bots(num_bots,&border,&bot_prop);
-        //let s=dists::spiral::Spiral::new([0.0,0.0],12.0,1.0);
-        //let bots:Vec<Bot>=s.take(num_bot).map(|pos|Bot::new(&Vec2::new(pos[0] as f32,pos[1] as f32))).collect();
-        let z=vec2(0.0,0.0);
-        let bots:Vec<Bot>=(0..num_bots).map(|_|Bot{pos:z,vel:z,acc:z}).collect();
-
-
-
-        let kk=vec2(-200.0,-100.0);
-        let color_button=Button::new(kk,3,unit*2.0,&symbols.game_table.0);
-
-
-        let buttons={
-            let mut v=vec2(-200.0,100.0);
-            let b1=Button::new(v,0,unit*2.0,&symbols.game_table.0);
-            v.x+=unit*20.0;
-            let b2=Button::new(v,1,unit*2.0,&symbols.game_table.0);
-            v.x+=unit*20.0;
-            let b3=Button::new(v,2,unit*2.0,&symbols.game_table.0);
-            v.x+=unit*20.0;
-            [b1,b2,b3]
-        };
-
-        /*
-        let kk=Vec2::new(unit*5.0,starty as f32-unit*70.0);    
-        let debug_button=OnOffButton::new(kk,
-                ascii_num::get_misc(4),
-                ascii_num::get_misc(5),
-                unit*2.0);
-        */
-
-        let numberthing={
-            let x=startx as f32-100.0;
-            let y=starty as f32-200.0;
-            NumberThing::new(40_000,unit*15.0,unit*2.0,vec2(x,y))
-        };
-
-        let col=[1.0,1.0,0.0];
-
-        let pin_code=PinCode::new(vec2(50.0,50.0),100.0,10.0);
-
-        (Display1{
-            bots,
-            buttons,
-            color_button,
-            col_counter:0 , //TODO hack
-            color_clicker:Clicker::new(),
-            numberthing,
-            pin_code,
-        },GameResponse{color:Some(col),new_game_world:Some((borderf32,10.0))})
-    }
-
-
-    pub fn step(&mut self,poses:&[Vec2<f32>],_border:&Rect<f32>,symbols:&Symbols,keystrokes:&[VirtualKeyCode])->GameResponse{
+    fn step(&mut self,poses:&[Vec2<f32>],_border:&Rect<f32>,symbols:&Symbols,keystrokes:&[VirtualKeyCode])->GameResponse{
         
         for k in keystrokes.iter(){
             let key = match k{
@@ -120,23 +120,38 @@ impl Display1{
                 }
             };
 
-            if let Some(key)=key{
-                println!("processing={:?}",key);
-                match self.pin_code.add(key){
-                    PinEnterResult::Fail=>{
-                        println!("hi alaina. that combination was a fail");
-                    },
-                    PinEnterResult::NotDoneYet=>{
+            if self.pin_code_counter.is_none(){
+                if let Some(key)=key{
+                    println!("processing={:?}",key);
 
-                    },
-                    PinEnterResult::Open=>{
-                        println!("hi alaina. you opened the lock");
+                    match self.pin_code.add(key){
+                        PinEnterResult::Fail=>{
+                            //self.pin_code=NumberThingOrFlasher::NumberFlasher::new(pincode)
+                            
+                            //std::thread::sleep(std::time::Duration::from_secs(5));
+                            self.pin_code_counter=Some(Timer::new(40,PinEnterResult::Fail));
+                            //self.pin_code_counter=(true,100);
+                            //self.pin_code.reset();
+                        },
+                        PinEnterResult::NotDoneYet=>{
+                            self.pin_code_counter=None;
+                        },
+                        PinEnterResult::Open=>{
+                            self.pin_code_counter=Some(Timer::new(1,PinEnterResult::Open));
+                            
+                            //self.pin_code_counter=(false,100);
+                            
+                        }
                     }
-                }
 
+                }
             }
 
+
+
         }
+
+
         let bots=&mut self.bots;
         
         for i in poses.iter(){
@@ -198,13 +213,104 @@ impl Display1{
         }
 
 
-        //let col=COLS[self.col_counter]; //TODO only show when it changes?
-        let g=GameResponse{new_game_world:None,color:None};
-        g
+        if let Some(timer)=&mut self.pin_code_counter{
+            if let Some(res) = timer.step(){
+                match res{
+                    PinEnterResult::Fail=>{
+                        println!("hi alaina. that combination was a fail"); 
+                        self.pin_code.reset();
+                        self.pin_code_counter=None;
+                    },
+                    PinEnterResult::Open=>{
+                        println!("hi alaina. you opened the lock");
+                        return GameResponse{new_game_world:None,color:None,next_world:true}
+                        //return true;
+                    },
+                    PinEnterResult::NotDoneYet=>{
+                        unreachable!()
+                    }
+                }
+            }
+        }
 
+        GameResponse{new_game_world:None,color:None,next_world:false}
     }
 
-    pub fn get_bots(&self)->&[Bot]{
+    fn get_bots(&self)->&[Bot]{
         &self.bots
+    }   
+}
+impl Display1{
+
+    pub fn new(symbols:&Symbols)->(Display1,GameResponse){
+        
+        let num_bots=5_000;
+        
+        let startx=500.0;
+        let starty=500.0;
+
+        //let border= axgeom::Rect::new(NotNaN::new(-startx).unwrap(),NotNaN::new(startx).unwrap(),NotNaN::new(-starty).unwrap(),NotNaN::new(starty).unwrap());
+        let borderf32= axgeom::Rect::new(-startx,startx ,-starty,starty);
+
+        //used as the building block for all positions
+        let unit=8.0;//bot::get_unit(startx,starty);
+        
+        //let br=unit*1.0;
+        //let mr=unit*10.0;
+
+        //let (bot_prop,mouse_prop)=bot::create_from_radius(br,mr);
+        //let bots=bot::create_bots(num_bots,&border,&bot_prop);
+        //let s=dists::spiral::Spiral::new([0.0,0.0],12.0,1.0);
+        //let bots:Vec<Bot>=s.take(num_bot).map(|pos|Bot::new(&Vec2::new(pos[0] as f32,pos[1] as f32))).collect();
+        let z=vec2(0.0,0.0);
+        let bots:Vec<Bot>=(0..num_bots).map(|_|Bot{pos:z,vel:vec2(50.0,0.0),acc:z}).collect();
+
+
+
+        let kk=vec2(-200.0,-100.0);
+        let color_button=Button::new(kk,3,unit*2.0,&symbols.game_table.0);
+
+
+        let buttons={
+            let mut v=vec2(-200.0,100.0);
+            let b1=Button::new(v,0,unit*2.0,&symbols.game_table.0);
+            v.x+=unit*20.0;
+            let b2=Button::new(v,1,unit*2.0,&symbols.game_table.0);
+            v.x+=unit*20.0;
+            let b3=Button::new(v,2,unit*2.0,&symbols.game_table.0);
+            v.x+=unit*20.0;
+            [b1,b2,b3]
+        };
+
+        /*
+        let kk=Vec2::new(unit*5.0,starty as f32-unit*70.0);    
+        let debug_button=OnOffButton::new(kk,
+                ascii_num::get_misc(4),
+                ascii_num::get_misc(5),
+                unit*2.0);
+        */
+
+        let numberthing={
+            let x=startx as f32-100.0;
+            let y=starty as f32-200.0;
+            NumberThing::new(40_000,unit*15.0,unit*2.0,vec2(x,y))
+        };
+
+        let col=[1.0,1.0,0.0];
+
+        let pin_code=PinCode::new(vec2(50.0,50.0),100.0,10.0);
+
+        (Display1{
+            bots,
+            buttons,
+            color_button,
+            col_counter:0 , //TODO hack
+            color_clicker:Clicker::new(),
+            numberthing,
+            pin_code,
+            pin_code_counter:None
+        },GameResponse{color:Some(col),new_game_world:Some((borderf32,10.0)),next_world:false})
     }
+
+
 }

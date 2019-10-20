@@ -1,22 +1,73 @@
 mod display1;
-
 use display1::*;
 
-//use dinotreedemomenu::dinotreedemo::dinotree::axgeom;
+pub use demodesktopgraphics::glutin;
 
 use demodesktopgraphics::GlSys;
 use demodesktopgraphics::Vertex;
-//use dinotreedemomenu::*;
 use dinotreedemo::dinotree::axgeom;
 
 use ascii_num::symbol::*;
 use ascii_num::*;
-
 use axgeom::Vec2;
-
 use axgeom::vec2;
 use dinotreedemo::compute_border;
 
+use glutin::event::WindowEvent;
+use glutin::event::ElementState;
+use glutin::event::VirtualKeyCode;
+use glutin::event::Event;
+use std::sync::Mutex;
+use std::sync::mpsc;
+
+use glutin::event_loop::ControlFlow;
+/*
+pub enum GameState{
+    First(Display1),
+    Second(Display2),
+}
+impl GameState{
+    fn step(&mut self,poses:&[Vec2<f32>],border:&Rect<f32>,symbols:&Symbols,keystrokes:&[VirtualKeyCode])->GameResponse{
+        match self{
+            First(a)=>{
+                a.step(poses,border,symbols,keystrokes)
+            },
+            Second(a)=>{
+                a.step(poses,border,symbols,keystrokes)
+            }
+        }
+    }
+    fn get_bots(&self)->&[Bot]{
+        match self{
+            First(a)=>{
+                a.get_bots()
+            },
+            Second(a)=>{
+                a.get_bots()
+            }
+        }
+    }
+
+    fn update(&self,buffer:&mut Buffer){
+        match self{
+            First(a)=>{
+                buffer.update(self.get_bots(),|a|{
+                    let speed = a.vel.magnitude2() * 0.01;
+                    Vertex([a.pos.x,a.pos.y,speed])
+                });        
+            },
+            Second(a)=>{
+                buffer.update(self.get_bots(),|a|{
+                    let speed = a.vel.magnitude2() * 0.01;
+                    Vertex([a.pos.x,a.pos.y,speed])
+                });  
+            }
+        }
+        
+    }
+
+}
+*/
 
 pub struct Symbols{
     digit_table:ascii_num::digit::DigitSymbolTable,
@@ -34,12 +85,18 @@ impl Symbols{
 fn main() {
     rayon::ThreadPoolBuilder::new().num_threads(num_cpus::get_physical()).build_global().unwrap();
      
-    let mut events_loop = glutin::EventsLoop::new();
+    let mut events_loop = glutin::event_loop::EventLoop::new();
     
 
-    //let (mut botsys,game_response)=MenuGame::new();
+    let proxy = events_loop.create_proxy();
+
+
+
     let symbols=Symbols::new();
     let (mut display1,game_response)=Display1::new(&symbols);
+
+    let mut display1:Box<dyn MenuTrait>=Box::new(display1);
+    
 
 
     let mut glsys=GlSys::new(&events_loop);
@@ -51,7 +108,14 @@ fn main() {
     
 
     glsys.set_camera_and_bot_radius(border,radius);
-    glsys.set_bot_color(game_response.color.unwrap());
+    
+    let color=game_response.color.unwrap();
+
+
+    let mut bot_verticies=Mutex::new(Vec::new());
+
+    let mut bot_buffer=glsys.create_vbo(0);
+    //glsys.set_bot_color(game_response.color.unwrap());
     
 
     struct Ba{
@@ -60,176 +124,174 @@ fn main() {
     }
 
     let mut running=true;
-    let mut mousepos=vec2(0.0,0.0);
-    let mut mouse_active=false;
-    let mut poses:Vec<Ba>=Vec::new(); 
     
+    let mut mousepos=vec2(0.0,0.0);
+    #[derive(Clone,Debug)]
+    struct GameInputs{
+        keystrokes:Vec<VirtualKeyCode>,
+        mouseposes:Vec<Vec2<f32>>
+    }
 
-    loop {  
-        
-        if !running{
-            return;
-        }
+    let game_inputs=GameInputs{keystrokes:Vec::new(),mouseposes:Vec::new()};
+    let game_inputs=Mutex::new(game_inputs);
 
-        let mut keystrokes=Vec::new();
 
-        events_loop.poll_events(|event| {
-            match event {
-                /*
-                if let Some(Button::Keyboard(key)) = e.press_args() {
-                    if key == Key::N {
-                        curr=demo_iter.next(area);
-                    }
+    
+    let (tx, rx): (mpsc::Sender<i32>, mpsc::Receiver<i32>) = mpsc::channel();
 
-                    if key == Key::C{
-                        
-                        check_naive= !check_naive;
-                        if check_naive{
-                            println!("Naive checking is on. Some demo's will now check the tree algorithm against a naive non tree version");
-                        }else{
-                            println!("Naive checking is off.");
-                        }
-                        
-                    }
+    //TODO talk to glutin about why there is a static lifetime bound.
+    let game_inputs_ref:&Mutex<GameInputs>=unsafe{&*(&game_inputs as *const _)};
+    let bot_verticies_ref:&Mutex<Vec<Vertex>>=unsafe{&*(&bot_verticies as *const _)};
+
+    crossbeam::thread::scope(move |s| {
+        s.spawn(move |s| {
+            loop{
+                let game_inputs = {
+                    let mut gg=game_inputs_ref.lock().unwrap();
+                    let game_inputs=gg.clone();
+                    gg.keystrokes.clear();
+                    gg.mouseposes.clear();
+                    game_inputs
                 };
-                */
+                //mutex get mouse pos    
+                let game_response=display1.step(&game_inputs.mouseposes,&border,&symbols,&game_inputs.keystrokes);
+
                 
-                glutin::Event::WindowEvent{ event, .. } => match event {
-                    glutin::WindowEvent::KeyboardInput{input,..}=>{
-                        if input.state==glutin::ElementState::Released{
+                let game_response = if game_response.next_world{
+                    let k=Display2::new(&symbols);
+                    //let ((rect,radius))=k.1.new_game_world.unwrap();
+                    //border=compute_border(rect,[startx as f32,starty as f32]);
+                    //glsys.set_camera_and_bot_radius(border,radius);
+                        
+                    display1=Box::new(k.0);
+                    /*
+                    for _ in 0..1000{
+                        display1.step(&va,&border,&symbols,&keystrokes);
+                    }
+                    */
+                    //display_counter=200;
+                    k.1
+                }else{
+                    game_response
+                };
+
+                {
+                    let mut bot_verticies=bot_verticies_ref.lock().unwrap();
+                    bot_verticies.clear();
+                    for b in display1.get_bots(){
+                        bot_verticies.push(Vertex([b.pos.x,b.pos.y,1.0]))    
+                    }
+                }
+                tx.send(0);
+                
+                //notify main thread to draw
+                std::thread::sleep(std::time::Duration::from_millis(16));
+            }
+        });
+
+
+
+        events_loop.run(move |event,_,control_flow| {
+            //*c=glutin::event_loop::ControlFlow::Exit;
+            
+            //dbg!(&event);
+            match event {
+
+                Event::WindowEvent{ event, .. } => match event {
+                    WindowEvent::KeyboardInput{input,..}=>{
+                        match input.virtual_keycode{
+                            Some(VirtualKeyCode::Escape)=>{println!("close requested");*control_flow=ControlFlow::Exit},
+                            _=>{}
+                        }
+
+                        if input.state==ElementState::Released{
+                            let mut vv=game_inputs_ref.lock().unwrap();
                             if let Some(k)=input.virtual_keycode{
-                                keystrokes.push(k);
+                                vv.keystrokes.push(k);
+                            }
+
+                            if let Some(k)=input.virtual_keycode{
+                                if k==VirtualKeyCode::C{
+                                    vv.mouseposes.push(mousepos);
+                                    //mouse_active=true
+                                }
                             }
                         }
+
+
                     },
-                    glutin::WindowEvent::CloseRequested => {running=false},
-                    glutin::WindowEvent::Resized(_logical_size) => {
-                        
+                    WindowEvent::CloseRequested => {println!("close requested!");running=false;},
+                    WindowEvent::Resized(logical_size) => {
+                        println!("reisezed={:?}",logical_size);
+                        //glsys.set_camera_and_bot_radius(border,radius);
                     },
                     
-                    glutin::WindowEvent::CursorMoved{modifiers:_,device_id:_,position:logical_position} => {
+                    WindowEvent::CursorMoved{modifiers:_,device_id:_,position:logical_position} => {
                         let glutin::dpi::LogicalPosition{x,y}=logical_position;
                         mousepos=vec2(x as f32,y as f32);
                     },
-
-                    glutin::WindowEvent::MouseInput{modifiers:_,device_id:_,state,button}=>{
-                        if button==glutin::MouseButton::Left{
-                            match state{
-                                glutin::ElementState::Pressed=>{  
-                                    mouse_active=true;  
-                                    
-                                }
-                                glutin::ElementState::Released=>{
-                                    mouse_active=false;
-                                }
-                            }
-                        }
-                    },
-                    glutin::WindowEvent::Touch(touch)=>{
-                        let glutin::dpi::LogicalPosition{x,y}=touch.location;
-                        //let x=(x*0.84) as f32; //TODO why needed????
-                        //let y=(y*0.84) as f32; 
-                        let x=x as f32;
-                        let y=y as f32;
-
-                        match touch.phase{
-                            glutin::TouchPhase::Started=>{
-
-                                let mut found=false;
-                                for i in poses.iter(){
-                                    if i.id == touch.id{
-                                        //panic!("There is a problem!");
-                                        found=true;
-                                        break;
-                                    }
-                                }
-                                if found==false{
-                                    poses.push(Ba{id:touch.id,pos:vec2(x,y)});
-                                }
-                            },
-                            glutin::TouchPhase::Ended | glutin::TouchPhase::Cancelled=>{
-                                //poses.clear();
-                                poses.retain(|a|a.id!=touch.id);
-                            },
-                            glutin::TouchPhase::Moved=>{
-                                let mut ok=false;
-                                for k in poses.iter_mut(){
-                                    if k.id==touch.id{
-                                        k.pos=vec2(x,y);
-                                        ok=true;
-                                        break;
-                                    }
-                                }
-                                
-                                if ok ==false{
-                                    panic!("Didnt find touch");
-                                }
-                              
-                            }
-                        }
-
-
-                    },
-                    glutin::WindowEvent::Refresh=>{
-                        //redraw=true;
-                        println!("refresh");
-                    },
+                    WindowEvent::RedrawRequested => {
+                        println!("redraaaaw");
+                        glsys.set_camera_and_bot_radius(border,radius);
+                           
+                        /*
+                        gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                        windowed_context.swap_buffers().unwrap();
+                        */
+                    }
                     _=>{}
                 },
-                glutin::Event::Suspended(_)=>{
-                },
+                EventsCleared=>{
+                    if let Ok(_) = rx.try_recv(){
+                        
+                        if game_response.next_world{
+                            let ((rect,radius))=game_response.new_game_world.unwrap();
+                            border=compute_border(rect,[startx as f32,starty as f32]);
+                            glsys.set_camera_and_bot_radius(border,radius);
+                            
+                        }
+
+
+                        let ll={
+                            let bot_verticies=bot_verticies_ref.lock().unwrap();
+
+                            if bot_verticies.len()!=bot_buffer.get_num_verticies(){
+                                glsys.re_generate_buffer(&mut bot_buffer,bot_verticies.len()); 
+                            }
+
+
+                            let mut counter=0;
+                            bot_buffer.update(&bot_verticies,|a|{
+                                *a
+                            });
+                            bot_verticies.len()
+                        };
+
+                        let mut ss=glsys.new_draw_session([0.0,0.0,0.4]);
+                        ss.draw_vbo_section(&bot_buffer,0,ll,[1.0,0.0,1.0]);
+                        //ss.draw_vbo_section(&bot_buffer,0,200,[1.0,0.0,3.0]);
+                        //ss.draw_vbo_section(&bot_buffer,200,display1.get_bots().len(),color);
+                        ss.finish();
+
+                        //let mut game_inputs=game_inputs.lock().unwrap();
+                        //game_inputs.mouseposes.clear();
+                        //game_inputs.keystrokes.clear();
+                    }
+                    
+                }
                 _ => {},
-            }    
+            }  
+
+
+
         });
 
+
+    }); 
     
 
-        let mut va:Vec<Vec2<f32>>=poses.iter().map(|a|a.pos).collect();
-        if mouse_active{
-            let mouseposx=mousepos.x-(startx as f32/2.0);
-            let mouseposy=mousepos.y-(starty as f32/2.0);
-        
-            let ((x1,x2),(y1,y2))=border.get();
-            let w=x2-x1;
-            let h=y2-y1;
 
-            let mouseposx=mouseposx*(w/startx as f32);
-            let mouseposy=mouseposy*(h/starty as f32);
-           
-            va.push(vec2(mouseposx,mouseposy));
-        }
-
-
-        
-        
-        let game_response=display1.step(&va,&border,&symbols,&keystrokes);
-
-        match game_response.new_game_world{
-            Some((rect,radius))=>{
-                border=compute_border(rect,[startx as f32,starty as f32]);
-                glsys.set_camera_and_bot_radius(border,radius);
-            },
-            _=>{}
-        }
-        match game_response.color{
-            Some(col)=>{
-                glsys.set_bot_color(col);
-            },
-            _=>{}
-        }
-
-
-        if display1.get_bots().len()!=glsys.get_num_verticies(){
-            glsys.re_generate_buffer(display1.get_bots().len()); 
-            println!("regen!");
-        }
-
-        glsys.update(display1.get_bots(),|a|Vertex([a.pos.x,a.pos.y]));
-            
-        glsys.draw();
-             
-        
-    }
+    
     
     
 }
