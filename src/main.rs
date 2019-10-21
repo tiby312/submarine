@@ -7,8 +7,8 @@ use demodesktopgraphics::GlSys;
 use demodesktopgraphics::Vertex;
 use dinotreedemo::dinotree::axgeom;
 
-use ascii_num::symbol::*;
-use ascii_num::*;
+
+
 use axgeom::Vec2;
 use axgeom::vec2;
 use dinotreedemo::compute_border;
@@ -17,8 +17,8 @@ use glutin::event::WindowEvent;
 use glutin::event::ElementState;
 use glutin::event::VirtualKeyCode;
 use glutin::event::Event;
-use std::sync::Mutex;
-use std::sync::mpsc;
+
+
 
 use glutin::event_loop::ControlFlow;
 /*

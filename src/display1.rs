@@ -1,7 +1,7 @@
 use dinotreedemo::dinotree::axgeom;
 use crate::glutin::event::VirtualKeyCode;
 use laid_dot::*;
-use ascii_num::*;
+
 use dinotreedemo::BotSystem;
 use axgeom::*;
 use crate::Symbols;
