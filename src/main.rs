@@ -69,7 +69,7 @@ impl GameState{
 }
 */
 
-pub static color_table:&'static [[f32;3]]=
+pub static COLOR_TABLE:&'static [[f32;3]]=
     &[
         [0.0,1.0,0.0],
         [0.9,0.9,0.9],
@@ -96,15 +96,14 @@ impl Symbols{
 fn main() {
     rayon::ThreadPoolBuilder::new().num_threads(num_cpus::get_physical()).build_global().unwrap();
      
-    let mut events_loop = glutin::event_loop::EventLoop::new();
+    let events_loop = glutin::event_loop::EventLoop::new();
     
 
-    let proxy = events_loop.create_proxy();
-
+    
 
 
     let symbols=Symbols::new();
-    let (mut display1,game_response)=Display1::new(&symbols);
+    let (display1,game_response)=Display1::new(&symbols);
 
     let mut display1:Box<dyn MenuTrait>=Box::new(display1);
     
@@ -120,33 +119,20 @@ fn main() {
 
     glsys.set_camera_and_bot_radius(border,radius);
     
-    let color=game_response.color.unwrap();
-
-
-
     
     let mut bot_buffer=glsys.create_vbo(0);
-    //glsys.set_bot_color(game_response.color.unwrap());
     
 
-    struct Ba{
-        pos:Vec2<f32>,
-        id:u64
-    }
-
-    let mut running=true;
-    
     let mut mousepos=vec2(0.0,0.0);
     #[derive(Clone,Debug)]
     struct GameInputs{
-        shut_down:bool,
         keystrokes:Vec<VirtualKeyCode>,
         mouseposes:Vec<Vec2<f32>>
     }
 
     let mut color_table_counter=0;
 
-    let mut game_inputs=GameInputs{shut_down:false,keystrokes:Vec::new(),mouseposes:Vec::new()};
+    let mut game_inputs=GameInputs{keystrokes:Vec::new(),mouseposes:Vec::new()};
     
 
     //TODO talk to glutin about why there is a static lifetime bound.
@@ -161,7 +147,6 @@ fn main() {
                     match input.virtual_keycode{
                         Some(VirtualKeyCode::Escape)=>{
                             *control_flow=ControlFlow::Exit;
-                            game_inputs.shut_down=true;
                         },
                         _=>{}
                     }
@@ -181,12 +166,12 @@ fn main() {
 
 
                 },
-                WindowEvent::CloseRequested => {println!("close requested!");running=false;},
-                WindowEvent::Resized(logical_size) => {
+                WindowEvent::CloseRequested => {println!("close requested!");*control_flow=ControlFlow::Exit;},
+                WindowEvent::Resized(_logical_size) => {
                     //glsys.set_camera_and_bot_radius(border,radius);
                 },
                 WindowEvent::MouseInput{device_id:_,state:ElementState::Released,button:_,modifiers:_}=>{
-                    color_table_counter=(color_table_counter+1) % color_table.len();
+                    color_table_counter=(color_table_counter+1) % COLOR_TABLE.len();
                 }
                 WindowEvent::CursorMoved{modifiers:_,device_id:_,position:logical_position} => {
                     let glutin::dpi::LogicalPosition{x,y}=logical_position;
@@ -215,7 +200,7 @@ fn main() {
                 }
                 _=>{}
             },
-            EventsCleared=>{
+            Event::EventsCleared=>{
                 let do_run = match last_time{
                     Some(last_time)=>{
                         if last_time.elapsed().as_millis()>=16{
@@ -251,7 +236,7 @@ fn main() {
 
                     
                     if let Some(new_game_world)=game_response.new_game_world{
-                        let ((rect,radius))=new_game_world;
+                        let (rect,radius)=new_game_world;
                         border=compute_border(rect,[startx as f32,starty as f32]);                            
                         glsys.set_camera_and_bot_radius(border,radius);
                     }
@@ -263,13 +248,12 @@ fn main() {
                     }
 
 
-                    let mut counter=0;
                     bot_buffer.update(&display1.get_bots(),|b|{
                         Vertex([b.pos.x,b.pos.y,1.0])
                     });
 
                     let mut ss=glsys.new_draw_session([0.0,0.0,0.0]);
-                    let color=color_table[color_table_counter];
+                    let color=COLOR_TABLE[color_table_counter];
                     ss.draw_vbo_section(&bot_buffer,0,display1.get_bots().len(),color);
                     //ss.draw_vbo_section(&bot_buffer,0,200,[1.0,0.0,3.0]);
                     //ss.draw_vbo_section(&bot_buffer,200,display1.get_bots().len(),color);

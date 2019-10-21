@@ -49,7 +49,7 @@ pub struct Display2{
 }
 
 impl Display2{
-    pub fn new(symbols:&Symbols)->(Display2,GameResponse){
+    pub fn new(_symbols:&Symbols)->(Display2,GameResponse){
         let (sys,rect,radius)=BotSystem::new(40_000);
         let numberthings=[
             NumberThing::new(8,300.0,30.0,vec2(-1500.0,-300.0)),
@@ -62,7 +62,7 @@ impl Display2{
 }
 
 impl MenuTrait for Display2{
-    fn step(&mut self,poses:&[Vec2<f32>],_border:&Rect<f32>,symbols:&Symbols,keystrokes:&[VirtualKeyCode])->GameResponse{
+    fn step(&mut self,poses:&[Vec2<f32>],_border:&Rect<f32>,symbols:&Symbols,_keystrokes:&[VirtualKeyCode])->GameResponse{
         self.bots.step(poses,_border);
         let mut bb=self.bots.get_bots_mut().iter_mut();
         for numberthing in self.numberthings.iter(){
@@ -92,7 +92,6 @@ pub struct Display1{
     buttons:[Button;3],
     color_button:Button,
     color_clicker:Clicker,
-    col_counter:usize,
     numberthing:NumberThing,
     pin_code:PinCode,
     pin_code_counter:Option<Timer<PinEnterResult>>
@@ -304,7 +303,6 @@ impl Display1{
             bots,
             buttons,
             color_button,
-            col_counter:0 , //TODO hack
             color_clicker:Clicker::new(),
             numberthing,
             pin_code,
