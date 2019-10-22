@@ -52,10 +52,10 @@ impl Display2{
     pub fn new(_symbols:&Symbols)->(Display2,GameResponse){
         let (sys,rect,radius)=BotSystem::new(40_000);
         let numberthings=[
-            NumberThing::new(8,300.0,30.0,vec2(-1500.0,-300.0)),
-            NumberThing::new(8,300.0,30.0,vec2(-300.0,-100.0)),
-            NumberThing::new(0,300.0,30.0,vec2(100.0,300.0)),
-            NumberThing::new(2,300.0,30.0,vec2(1200.0,600.0)),
+            NumberThing::new(5,300.0,30.0,vec2(-1500.0,-300.0)),
+            NumberThing::new(3,300.0,30.0,vec2(-300.0,-100.0)),
+            NumberThing::new(7,300.0,30.0,vec2(100.0,300.0)),
+            NumberThing::new(3,300.0,30.0,vec2(1200.0,600.0)),
         ];
         (Display2{bots:sys,numberthings},GameResponse{color:Some([0.0,1.0,0.0]),new_game_world:Some((rect,radius)),next_world:false})
     }
