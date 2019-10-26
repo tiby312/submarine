@@ -17,57 +17,9 @@ use glutin::event::WindowEvent;
 use glutin::event::ElementState;
 use glutin::event::VirtualKeyCode;
 use glutin::event::Event;
-
-
-
 use glutin::event_loop::ControlFlow;
-/*
-pub enum GameState{
-    First(Display1),
-    Second(Display2),
-}
-impl GameState{
-    fn step(&mut self,poses:&[Vec2<f32>],border:&Rect<f32>,symbols:&Symbols,keystrokes:&[VirtualKeyCode])->GameResponse{
-        match self{
-            First(a)=>{
-                a.step(poses,border,symbols,keystrokes)
-            },
-            Second(a)=>{
-                a.step(poses,border,symbols,keystrokes)
-            }
-        }
-    }
-    fn get_bots(&self)->&[Bot]{
-        match self{
-            First(a)=>{
-                a.get_bots()
-            },
-            Second(a)=>{
-                a.get_bots()
-            }
-        }
-    }
 
-    fn update(&self,buffer:&mut Buffer){
-        match self{
-            First(a)=>{
-                buffer.update(self.get_bots(),|a|{
-                    let speed = a.vel.magnitude2() * 0.01;
-                    Vertex([a.pos.x,a.pos.y,speed])
-                });        
-            },
-            Second(a)=>{
-                buffer.update(self.get_bots(),|a|{
-                    let speed = a.vel.magnitude2() * 0.01;
-                    Vertex([a.pos.x,a.pos.y,speed])
-                });  
-            }
-        }
-        
-    }
 
-}
-*/
 
 pub static COLOR_TABLE:&'static [[f32;3]]=
     &[
@@ -98,17 +50,10 @@ fn main() {
      
     let events_loop = glutin::event_loop::EventLoop::new();
     
-
-    
-
-
     let symbols=Symbols::new();
     let (display1,game_response)=Display1::new(&symbols);
 
     let mut display1:Box<dyn MenuTrait>=Box::new(display1);
-    
-
-
     let mut glsys=GlSys::new(&events_loop);
     
 
@@ -133,8 +78,9 @@ fn main() {
     let mut color_table_counter=0;
 
     let mut game_inputs=GameInputs{keystrokes:Vec::new(),mouseposes:Vec::new()};
-    
+    let mut mouse_pressed=false;
 
+    let mut color_alpha=0.0;
     //TODO talk to glutin about why there is a static lifetime bound.
     let mut last_time:Option<std::time::Instant>=None;
     
@@ -171,8 +117,12 @@ fn main() {
                     //glsys.set_camera_and_bot_radius(border,radius);
                 },
                 WindowEvent::MouseInput{device_id:_,state:ElementState::Released,button:_,modifiers:_}=>{
-                    color_table_counter=(color_table_counter+1) % COLOR_TABLE.len();
-                }
+                    mouse_pressed=false;
+                },
+                WindowEvent::MouseInput{device_id:_,state:ElementState::Pressed,button:_,modifiers:_}=>{
+                    mouse_pressed=true;
+                    //color_table_counter=(color_table_counter+1) % COLOR_TABLE.len();
+                },
                 WindowEvent::CursorMoved{modifiers:_,device_id:_,position:logical_position} => {
                     let glutin::dpi::LogicalPosition{x,y}=logical_position;
                     let mousepos2=vec2(x as f32,y as f32);
@@ -215,7 +165,6 @@ fn main() {
                 };
 
                 if do_run{
-                    //mutex get mouse pos    
                     let game_response=display1.step(&game_inputs.mouseposes,&border,&symbols,&game_inputs.keystrokes);
 
                     
@@ -249,9 +198,16 @@ fn main() {
 
 
                     bot_buffer.update(&display1.get_bots(),|b|{
-                        Vertex([b.pos.x,b.pos.y,1.0])
+                        Vertex([b.pos.x,b.pos.y,color_alpha])
                     });
 
+                    if mouse_pressed{
+                        color_alpha=(color_alpha+0.01f32).min(1.0);
+                    }else{
+                        color_alpha=(color_alpha-0.01).max(0.0);    
+                    }
+                    
+                    
                     let mut ss=glsys.new_draw_session([0.0,0.0,0.0]);
                     let color=COLOR_TABLE[color_table_counter];
                     ss.draw_vbo_section(&bot_buffer,0,display1.get_bots().len(),color);
