@@ -202,9 +202,9 @@ fn main() {
                     });
 
                     if mouse_pressed{
-                        color_alpha=(color_alpha+0.01f32).min(1.0);
+                        color_alpha=(color_alpha+0.02f32).min(1.0);
                     }else{
-                        color_alpha=(color_alpha-0.01).max(0.0);    
+                        color_alpha=(color_alpha-0.02).max(0.0);    
                     }
                     
                     
